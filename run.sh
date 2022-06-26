@@ -1,23 +1,53 @@
-#!/bin/bash
+set -e
+if ! [ -z "$BASH" ]; then
+    # Only Bash supports this feature
+    set -o pipefail
+fi
+set -u
 
-set -eu
+# This checks if we're running on MacOS
+_kernel_name="$(uname -s)"
+case "${_kernel_name}" in
+    darwin*|Darwin*)    
+        # It's MacOS.
+        # Mac doesn't support the "-d" flag for base64 decoding, 
+        # so we have to use the full "--decode" flag instead.
+        _decode_flag="--decode" ;;
+    *)
+        # It's NOT MacOS.
+        # Not all Linux base64 installs (e.g. BusyBox) support the full
+        # "--decode" flag. So, we use "-d" here, since it's supported
+        # by everything except MacOS.
+        _decode_flag="-d" ;;
+esac
+
+# This checks if the "-n" flag is supported on this shell, and sets vars accordingly
+if [ "`echo -n`" = "-n" ]; then
+  _echo_n=""
+  _echo_c="\c"
+else
+  _echo_n="-n"
+  _echo_c=""
+fi
+
+_raw_input="$(cat)"
 
 # We know that all of the inputs are base64-encoded, and "|" is not a valid base64 character, so therefore it
 # cannot possibly be included in the stdin.
-IFS="|" read -a PARAMS <<< $(cat | sed -e 's/__76a7143569c7498988ed9f9c5748352c_TF_MAGIC_SEGMENT_SEPARATOR/|/g')
-
-_create=$(echo "${PARAMS[1]}" | base64 --decode)
-_touch=$(echo "${PARAMS[2]}" | base64 --decode)
-_uuid=$(echo "${PARAMS[3]}" | base64 --decode)
-_idx="${PARAMS[4]}"
-_num_chunks="${PARAMS[5]}"
-_content=$(echo "${PARAMS[6]}" | base64 --decode)
-_filename=$(echo "${PARAMS[7]}" | base64 --decode)
-_is_base64=$(echo "${PARAMS[8]}" | base64 --decode)
-_file_permissions=$(echo "${PARAMS[9]}" | base64 --decode)
-_directory_permissions=$(echo "${PARAMS[10]}" | base64 --decode)
-_directory=$(echo "${PARAMS[11]}" | base64 --decode)
-_append=$(echo "${PARAMS[12]}" | base64 --decode)
+IFS="|"
+set -o noglob
+set -- $_raw_input""
+_create="$2"
+_touch="$3"
+_uuid="$4"
+_filename="$(echo "$5" | base64 $_decode_flag)"
+_file_permissions="$6"
+_directory_permissions="$7"
+_directory="$(echo "$8" | base64 $_decode_flag)"
+_append="$9"
+_num_chunks="${10}"
+_idx="${11}"
+# ${12} is the content itself, which we reference directly down below
 
 # If the "create" variable is false, don't actually create the file, just do special actions here
 if [ "$_create" != "true" ]; then
@@ -28,62 +58,74 @@ if [ "$_create" != "true" ]; then
             touch "$_filename"
         fi
         # Set permissions on the file
-        chmod "$_file_permissions" "$_filename"
+        chmod $_file_permissions "$_filename"
     fi
     # Exit out without doing anything else
-    echo -n "{}"
+    echo $_echo_n "{}${_echo_c}"
     exit 0
 fi
 
-# Convert from base64 if it is base64
-if [ "$_is_base64" = "true" ]; then
-    _content=$(echo "$_content" | base64 --decode)
-fi
-
 if [ $_num_chunks -eq 1 ]; then
+    # Create the parent directories if necessary
+    mkdir -p -m "$_directory_permissions" "$_directory"
+
     # There's only one chunk, so just write directly to the destination file
     # Store the content in the file
     if [ "$_append" = "true" ]; then
-        echo -n "$_content" >> "$_filename"
+        echo "${12}" | base64 $_decode_flag >> "$_filename"
     else
-        echo -n "$_content" > "$_filename"
+        echo "${12}" | base64 $_decode_flag > "$_filename"
     fi
+    # Set the file permissions on the file. We do this at the end in case 
+    # the permissions preclude this process from appending more content.
+    chmod "$_file_permissions" "$_filename"
 else
-    # There are multiple chunks, so write to a temp file
-    echo -n "$_content" > "$_uuid.$_idx.chunk"
-
-    # If it's the final chunk
+    # Check if it's the last chunk
     if [ $_idx -eq $(( $_num_chunks - 1 )) ]; then
-        # Create the parent directories if necessary
+        # It's the last chunk
+
+        # Delete any leftover chunk files from a failed run
+        # The -f prevents an error if there are no matching files
+        rm -f "$_uuid.*"
+
+        # Create the parent directories if necessary,
+        # using the desired permissions.
         mkdir -p -m "$_directory_permissions" "$_directory"
 
-        # Wait for each other chunk to be complete
-        _all_chunk_files=()
-        for (( i=0; i<$_num_chunks; i++)); do
-            # Determine what the filename of the chunk will be
-            _chunk_file="$_uuid.$i.chunk"
+        if [ "$_append" = "true" ]; then
+            # Append it to an existing file if desired
+            echo "${12}" | base64 $_decode_flag >> "$_filename"
+        else
+            # Otherwise, write without appending to overwrite any
+            # existing files.
+            echo "${12}" | base64 $_decode_flag > "$_filename"
+        fi
+        
+        _chunk_idx=0
+        while [ $_chunk_idx -le  ]; do
+            _chunk_filename="$_uuid.$_chunk_idx"
 
-            # Wait for the file to be created
-            while [ ! -f "$_chunk_file" ]; do sleep 0.05; done
-            
-            # Add the filename to the array of filenames to cat
-            _all_chunk_files+=("$_chunk_file")
+            # Wait for the chunk to be complete
+            while [ ! -f "$_chunk_filename" ]; do sleep 0.05; done
+
+
+            true > "$j.json"
+            _chunk_idx=$(( $_chunk_idx + 1 ))
         done
 
-        # Merge all files into the destination file
-        if [ "$_append" = "true" ]; then
-            cat "${_all_chunk_files[@]}" >> "$_filename"
-        else
-            cat "${_all_chunk_files[@]}" > "$_filename"
-        fi
-
-        # Set permissions on the file
+        # Set permissions on the file. Wedo this at the end in case the 
+        # permissions preclude this process from appending more content.
         chmod "$_file_permissions" "$_filename"
 
-        # Delete all chunk files
-        rm ${_all_chunk_files[@]}
-    fi  
+    else
+        # Determine the name of the chunk file
+        _chunk_filename="$_uuid.$_idx"
+        
+        # Write the content to the chunk file
+        echo "${12}" | base64 $_decode_flag > "$_chunk_filename"
+    fi
 fi
 
 # We must return valid JSON in order for Terraform to not lose its mind
-echo -n "{}"
+echo $_echo_n "{}${_echo_c}"
+exit 0

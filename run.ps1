@@ -6,14 +6,18 @@ set-strictmode -version 3.0
 
 $jsonpayload = [Console]::In.ReadLine()
 $json = ConvertFrom-Json $jsonpayload
+$_uuid = $json.id
+$_idx = [System.Convert]::ToInt32($json.idx)
+
 $_filename = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($json.filename))
-$_idx = $json.idx
+$_create = [System.Convert]::ToBoolean($json.create)
+$_touch = [System.Convert]::ToBoolean($json.touch)
 
 # If the "create" variable is false, don't actually create the file, just do special actions here
-if ( [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($json.create)) -ne "true" ) {
+if ( -not $_create ) {
     # If we're not creating the file, but still need to update the timestamp on it, do that without writing content
     # Only if this is the first chunk though
-    if ( ( $_idx -eq 0 ) -and ( [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($json.touch)) -eq "true" ) ) {
+    if ( ( $_idx -eq 0 ) -and $_touch ) {
         (Get-Item "$_filename").LastWriteTime = (Get-Date)
     }
     # Exit out without doing anything else
@@ -21,61 +25,64 @@ if ( [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($
     exit 0
 }
 
-# Decode the content and filename
-$_uuid = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($json.uuid))
-$_num_chunks = $json.num_chunks
-$_content = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($json.content))
-$_is_base64 = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($json.is_base64))
 $_directory = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($json.directory))
-$_append = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($json.append))
+$_append = [System.Convert]::ToBoolean($json.append)
+$_num_chunks = [System.Convert]::ToInt32($json.num_chunks)
 
-# Convert from base64 if it is base64
-if ( "$_is_base64" -eq "true" ) {
-    $_content = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("$_content"))
-}
-
-if ( $_num_chunks -eq 1 ) {
+if ($_num_chunks -eq 1) {
     # There's only one chunk, so just write directly to the destination file
     # First, create the directory if necessary
     New-Item -ItemType Directory -Force -Path "$_directory" | Out-Null
     # Store the content in the file
-    if ( "$_append" -eq "true" ) {
-        [System.IO.File]::AppendAllText("$_filename", "$_content")
+    if ( $_append ) {
+        # This is the only command that supports appending raw bytes. We use it because we have to, but it's slow.
+        Add-Content "$_filename" -Value $([System.Convert]::FromBase64String($json.content)) -Encoding Byte -NoNewLine
     }
     else {
-        [System.IO.File]::WriteAllText("$_filename", "$_content")
+        [System.IO.File]::WriteAllBytes("$_filename", [System.Convert]::FromBase64String($json.content))
     }
 }
 else {
-    # There are multiple chunks, so write to a temp file
-    [System.IO.File]::WriteAllText("$_uuid.$_idx.chunk", "$_content")
+    if ( $_idx -eq 0) {
+        # It's the first chunk
 
-    # If it's the final chunk
-    if ( $_idx -eq ( $_num_chunks - 1 ) ) {
-        # Create the parent directories if necessary
-        if ( !(test-path "$_directory") ) {
-            New-Item -ItemType Directory -Force -Path "$_directory" | Out-Null
+        # Delete any leftover chunk files from a failed run
+        Remove-Item "$_uuid.*"
+
+        # Create the parent directories if necessary,
+        # using the desired permissions.
+        New-Item -ItemType Directory -Force -Path "$_directory" | Out-Null
+
+        if ( $_append ) {
+            # Append it to an existing file if desired
+            # This is the only command that supports appending raw bytes. We use it because we have to, but it's slow.
+            Add-Content "$_filename" -Value $([System.Convert]::FromBase64String($json.content)) -Encoding Byte -NoNewLine
         }
-
-        # Wait for each other chunk to be complete
-        for ($i = 0; $i -lt $_num_chunks; $i += 1 ) {
-            # Determine what the filename of the chunk will be
-            $_chunk_file = "$_uuid.$i.chunk"
-
-            # Wait for the file to be created
-            while (!(Test-Path "$_chunk_file")) { Start-Sleep -Milliseconds 50 }
-
-            # Merge all files into the destination file
-            if ($i -eq 0) {
-                [System.IO.File]::WriteAllText("$_filename", $(Get-Content -Encoding utf8 -Raw "$_chunk_file"))
-            }
-            else {
-                [System.IO.File]::AppendAllText("$_filename", $(Get-Content -Encoding utf8 -Raw "$_chunk_file"))
-            }
-            # Delete all chunk files
-            Remove-Item "$_chunk_file"
+        else {
+            # Otherwise, write without appending to overwrite any
+            # existing files.
+            [System.IO.File]::WriteAllBytes("$_filename", [System.Convert]::FromBase64String($json.content))
         }
+    }
+    else {
+        # Determine the name of the previous chunk completion indicator file
+        $_previous_chunk_filename = "$_uuid.$( $_idx - 1 )"
+        
+        # Wait for the file to be created
+        while (!(Test-Path "$_previous_chunk_filename")) { Start-Sleep -Milliseconds 50 }
+        
+        # Delete the previous chunk's indicator file
+        Remove-Item "$_previous_chunk_filename"
+
+        # Once the previous chunk is done, append this chunk
+        Add-Content "$_filename" -Value $([System.Convert]::FromBase64String($json.content)) -Encoding Byte -NoNewLine
     }
 }
 
+if ($_idx -ne ($_num_chunks - 1)) {
+    New-Item -ItemType file "$_uuid.$_idx" | Out-Null
+}
+
+# We must return valid JSON in order for Terraform to not lose its mind
 @{} | ConvertTo-Json
+exit 0

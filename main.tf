@@ -3,8 +3,8 @@ module "assert_valid_input" {
   source  = "Invicton-Labs/assertion/null"
   version = "~>0.2.1"
   condition = length([for c in [
-    var.content,
-    var.content_base64
+    local.var_content,
+    local.var_content_base64
     ] :
     true
     if c != null
@@ -17,33 +17,44 @@ module "assert_valid_input" {
 module "assert_chunked" {
   source        = "Invicton-Labs/assertion/null"
   version       = "~>0.2.1"
-  condition     = length(local.content) <= var.override_chunk_size || var.max_characters != null
-  error_message = "If the content length is greater than the file chunk size (${var.override_chunk_size} characters), then the `max_characters` variable must be provided and known during the plan step."
+  condition     = length(local.is_base64 ? local.var_content_base64 : local.var_content) <= local.var_chunk_size || local.var_max_characters != null
+  error_message = "If the content length is greater than the file chunk size (${local.var_chunk_size} characters), then the `max_characters` variable must be provided and known during the plan step."
 }
 
-// Create a UUID for this run of this module (changes on every plan step)
-module "uuid" {
-  source  = "Invicton-Labs/uuid/random"
-  version = "~>0.1.0"
+// Ensure there aren't too many chunks
+module "assert_num_chunks" {
+  source        = "Invicton-Labs/assertion/null"
+  version       = "~>0.2.1"
+  condition     = local.num_chunks <= 1024
+  error_message = "The given file would require ${local.num_chunks} chunk operations, which is more than the limit of 1024."
 }
 
 locals {
   is_windows = dirname("/") == "\\"
 
-  // A magic string that we use as a separator. It contains a UUID, so in theory, should
-  // be a globally unique ID that will never appear in input content
-  unix_query_separator = "__76a7143569c7498988ed9f9c5748352c_TF_MAGIC_SEGMENT_SEPARATOR"
-
   // Whether the content came from the content_base64 variable
-  is_base64 = var.content == null
+  is_base64 = local.var_content_base64 != null
 
   // Find the correct content source
-  content = module.assert_valid_input.checked ? (local.is_base64 ? var.content_base64 : var.content) : null
+  //content = module.assert_valid_input.checked ? (local.is_base64 ? local.var_content_base64 : local.var_content) : null
 
   // Whether the output file already exists
   // Don't bother with this if we're appending, since we'll always need to modify in that case
-  file_exists = fileexists(var.filename) && !var.append
+  file_exists = module.assert_valid_input.checked ? fileexists(local.var_filename) && !local.var_append : null
 
+  // Whether the file needs to be created/recreated. If it doesn't exist yet, that's true.
+  needs_creation = !local.file_exists ? true : (
+    // It does exist, so compare the existing file to the desired content
+    local.is_base64 ? (
+      // The content is base64, so compare the base64-encoded file content with the provided file content
+      local.var_content_base64 != filebase64(local.var_filename)
+      ) : (
+      // The content is raw, so hash the content and compare that against the hash of the file
+      base64sha256(local.var_content) != filebase64sha256(local.var_filename)
+    )
+  )
+
+  /*
   // Try decoding the content if it's base64
   content_decoded = local.file_exists && local.is_base64 ? try(base64decode(local.content), null) : null
 
@@ -76,70 +87,85 @@ locals {
   ) : null
 
   // If the input is base64, then we want to compare against the base64-encoded file for apples-to-apples comparison
-  file_hash = local.file_exists ? (local.is_base64 ? base64sha256(filebase64(var.filename)) : filebase64sha256(var.filename)) : null
+  file_hash = local.file_exists ? (local.is_base64 ? base64sha256(filebase64(local.var_filename)) : filebase64sha256(local.var_filename)) : null
 
   // Whether or not the file needs to be created. Could be that it was never created before, or
   // that it has been deleted, or that the content has changed.
   needs_creation = local.file_exists ? !contains(local.possible_hashes, local.file_hash) : true
+*/
 
   // Calculate how many chunks we need to split it into
-  num_chunks = var.max_characters == null ? 1 : ceil(var.max_characters / var.override_chunk_size)
+  num_chunks = local.var_max_characters == null ? 1 : ceil(local.var_max_characters / local.var_chunk_size)
 
   // Split it into chunks
   chunks = local.num_chunks == 1 ? {
-    0 = local.needs_creation ? base64encode(local.content) : ""
+    // If it needs creation, use the base64-encoded content (could be already b64, or we need to encode it ourselves)
+    0 = local.needs_creation ? (local.is_base64 ? local.var_content_base64 : base64encode(local.var_content)) : ""
     } : {
-    for i in range(0, local.num_chunks) :
-    i => local.needs_creation ? base64encode(substr(local.content, i * var.override_chunk_size, var.override_chunk_size)) : ""
+    for i in module.assert_num_chunks.checked ? range(0, local.num_chunks) : null :
+    i => local.needs_creation ? (local.is_base64 ? substr(local.var_content_base64, i * local.var_chunk_size, local.var_chunk_size) : base64encode(substr(local.var_content, i * local.var_chunk_size, local.var_chunk_size))) : ""
   }
 
-  create_base64               = base64encode(local.needs_creation ? "true" : "false")
-  touch_base64                = base64encode(var.force_update_last_modified ? "true" : "false")
-  filename_base64             = base64encode(abspath(var.filename))
-  uuid_base64                 = base64encode(module.uuid.uuid)
-  is_base64_base64            = base64encode(local.is_base64 ? "true" : "false")
-  file_permission_base64      = base64encode(var.file_permission)
-  directory_permission_base64 = base64encode(var.directory_permission)
-  dirname_base64              = base64encode(dirname(abspath(var.filename)))
-  append_base64               = base64encode(var.append ? "true" : "false")
+  // Create a unique ID, which we generate from the absolute path of the file, plus some other parameters that will
+  // hopefully make it unique. It SHOULD be unique because this module should never be used twice with exactly the
+  // same filename, as they would conflict anyways. We can't use the `uuid` function, because that function doesn't
+  // return a value until apply time.
+  id = sha256(jsonencode([
+    local.needs_creation,
+    local.var_force_wait_for_apply,
+    local.var_force_update_last_modified,
+    abspath(local.var_filename),
+    local.is_base64,
+    local.var_file_permission,
+    local.var_directory_permission,
+    local.var_append,
+    local.num_chunks,
+    terraform.workspace,
+    abspath(path.module),
+    base64sha256(local.is_base64 ? local.var_content_base64 : local.var_content),
+  ]))
 
-  // We use the uuid function to force a wait for apply, since Terraform doesn't generate the UUID until the apply step
-  // Only wait if the file needs to be created AND the associated variable is set
-  wait_for_apply = local.needs_creation ? (var.force_wait_for_apply ? uuid() : null) : null
+  query = {
+    create               = local.needs_creation ? "true" : "false"
+    touch                = local.var_force_update_last_modified ? "true" : "false"
+    id                   = local.id
+    filename             = base64encode(abspath(local.var_filename))
+    file_permission      = local.var_file_permission
+    directory_permission = local.var_directory_permission
+    directory            = base64encode(dirname(abspath(local.var_filename)))
+    append               = local.var_append ? "true" : "false"
+    num_chunks           = local.num_chunks
+  }
 }
 
 data "external" "create_file_chunk" {
-  program  = local.is_windows ? ["powershell.exe", "${abspath(path.module)}/run.ps1"] : ["${abspath(path.module)}/run.sh"]
+  depends_on = [
+    local.file_exists
+  ]
+  program  = local.is_windows ? ["powershell.exe", "${abspath(path.module)}/run.ps1"] : [local.var_unix_interpreter, "${abspath(path.module)}/run.sh"]
   for_each = local.chunks
-  query = sensitive(local.is_windows ? {
-    // If it's Windows, just use the input value since PowerShell can natively handle JSON decoding
-    create     = local.create_base64
-    touch      = local.touch_base64
-    uuid       = local.uuid_base64
-    idx        = tonumber(each.key)
-    num_chunks = local.num_chunks
-    content    = each.value
-    filename   = local.filename_base64
-    is_base64  = local.is_base64_base64
-    directory  = local.dirname_base64
-    append     = local.append_base64
-    } : {
+  // If it's Windows, just use the input value since PowerShell can natively handle JSON decoding
+  query = (local.is_windows ? merge(local.query, {
+    idx     = tonumber(each.key)
+    content = each.value
+    }) : {
     // If it's Unix, we have to convert all characters that JSON escapes into special strings that we can easily convert back WITHOUT needing any other installed tools such as jq
-    "" = join("", [local.unix_query_separator, join(local.unix_query_separator, [
-      local.create_base64,
-      local.touch_base64,
-      local.uuid_base64,
+    "" = join("|", [
+      "",
+      local.query.create,
+      local.query.touch,
+      local.query.id,
+      local.query.filename,
+      local.query.file_permission,
+      local.query.directory_permission,
+      local.query.directory,
+      local.query.append,
+      local.query.num_chunks,
       tonumber(each.key),
-      local.num_chunks,
       each.value,
-      local.filename_base64,
-      local.is_base64_base64,
-      local.file_permission_base64,
-      local.directory_permission_base64,
-      local.dirname_base64,
-      local.append_base64,
-    ]), local.unix_query_separator])
+      "",
+    ])
   })
   // Force the data source to wait for the apply, if that is what is desired
-  working_dir = module.assert_chunked.checked && local.wait_for_apply == null ? "${path.module}/tmpfiles" : "${path.module}/tmpfiles"
+  working_dir = module.assert_chunked.checked && (jsonencode(local.var_dynamic_depends_on) == "" ? true : true) && ((local.var_force_wait_for_apply ? uuid() : "") == "") ? "${path.module}/tmpfiles" : "${path.module}/tmpfiles"
 }
