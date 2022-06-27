@@ -11,7 +11,7 @@ jobs:
         id: matrix
         uses: Invicton-Labs/terraform-module-testing-configuration/matrix@main
         with:
-          minimum_tf_version: '0.13.0'
+          minimum_tf_version: '0.14.0'
 
       - name: Output Matrix
         run: |
