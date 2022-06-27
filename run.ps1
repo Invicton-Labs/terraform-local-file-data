@@ -6,7 +6,7 @@ set-strictmode -version 3.0
 
 $jsonpayload = [Console]::In.ReadLine()
 $json = ConvertFrom-Json $jsonpayload
-$_uuid = $json.id
+$_uuid = $json.uuid
 $_idx = [System.Convert]::ToInt32($json.idx)
 
 $_filename = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($json.filename))
@@ -43,44 +43,43 @@ if ($_num_chunks -eq 1) {
     }
 }
 else {
-    if ( $_idx -eq 0) {
-        # It's the first chunk
+    if ( $_idx -eq ($_num_chunks - 1)) {
+        # It's the last chunk
 
-        # Delete any leftover chunk files from a failed run
-        Remove-Item "$_uuid.*"
-
-        # Create the parent directories if necessary,
-        # using the desired permissions.
+        # Create the parent directories if necessary
         New-Item -ItemType Directory -Force -Path "$_directory" | Out-Null
 
-        if ( $_append ) {
-            # Append it to an existing file if desired
+        if ((-not $_append) -and (Test-Path $_filename)) {
+            Remove-Item "$_filename" | Out-Null
+        }
+
+        # Loop through all previous chunks
+        for ($_chunk_idx = 0; $_chunk_idx -lt ($_num_chunks - 1); $_chunk_idx += 1 ) {
+
+            # Determine the name of the previous chunk file
+            $_chunk_filename = "$_uuid.$_chunk_idx"
+
+            # Wait for the file to be created
+            while (!(Test-Path "$_chunk_filename")) { Start-Sleep -Milliseconds 50 }
+
+            # Read the base64 content from file, decode it, and append the bytes to the final target file.
             # This is the only command that supports appending raw bytes. We use it because we have to, but it's slow.
-            Add-Content "$_filename" -Value $([System.Convert]::FromBase64String($json.content)) -Encoding Byte -NoNewLine
+            Add-Content "$_filename" -Value $([System.Convert]::FromBase64String([System.IO.File]::ReadAllText("$_chunk_filename"))) -Encoding Byte -NoNewLine
         }
-        else {
-            # Otherwise, write without appending to overwrite any
-            # existing files.
-            [System.IO.File]::WriteAllBytes("$_filename", [System.Convert]::FromBase64String($json.content))
-        }
+
+        # Append the final chunk
+        Add-Content "$_filename" -Value $([System.Convert]::FromBase64String($json.content)) -Encoding Byte -NoNewLine
+
+        # Remove all chunk files
+        Remove-Item "$_uuid.*"
     }
     else {
-        # Determine the name of the previous chunk completion indicator file
-        $_previous_chunk_filename = "$_uuid.$( $_idx - 1 )"
+        # Determine the name of the chunk file
+        $_chunk_filename = "$_uuid.$_idx"
         
-        # Wait for the file to be created
-        while (!(Test-Path "$_previous_chunk_filename")) { Start-Sleep -Milliseconds 50 }
-        
-        # Delete the previous chunk's indicator file
-        Remove-Item "$_previous_chunk_filename"
-
-        # Once the previous chunk is done, append this chunk
-        Add-Content "$_filename" -Value $([System.Convert]::FromBase64String($json.content)) -Encoding Byte -NoNewLine
+        # Write the content to the chunk file (still in base64 format)
+        [System.IO.File]::WriteAllText("$_chunk_filename", $json.content)
     }
-}
-
-if ($_idx -ne ($_num_chunks - 1)) {
-    New-Item -ItemType file "$_uuid.$_idx" | Out-Null
 }
 
 # We must return valid JSON in order for Terraform to not lose its mind

@@ -84,45 +84,47 @@ else
     if [ $_idx -eq $(( $_num_chunks - 1 )) ]; then
         # It's the last chunk
 
-        # Delete any leftover chunk files from a failed run
-        # The -f prevents an error if there are no matching files
-        rm -f "$_uuid.*"
-
         # Create the parent directories if necessary,
         # using the desired permissions.
         mkdir -p -m "$_directory_permissions" "$_directory"
 
-        if [ "$_append" = "true" ]; then
-            # Append it to an existing file if desired
-            echo "${12}" | base64 $_decode_flag >> "$_filename"
-        else
-            # Otherwise, write without appending to overwrite any
-            # existing files.
-            echo "${12}" | base64 $_decode_flag > "$_filename"
+        # If we're not appending, delete any existing file
+        if [ "$_append" != "true" ]; then
+            rm -f "$_filename"
         fi
         
         _chunk_idx=0
-        while [ $_chunk_idx -le  ]; do
+        # Loop through all previous chunks
+        while [ $_chunk_idx -lt $(( $_num_chunks - 1 )) ]; do
+
+            # Determine the name of the previous chunk file
             _chunk_filename="$_uuid.$_chunk_idx"
 
-            # Wait for the chunk to be complete
+            # Wait for the chunk to be written
             while [ ! -f "$_chunk_filename" ]; do sleep 0.05; done
 
+            # Decode the chunk and append it to the final file
+            cat "$_chunk_filename" | base64 $_decode_flag >> "$_filename"
 
-            true > "$j.json"
+            # Delete the chunk file
+            rm "$_chunk_filename"
+            
+            # Increment the chunk counter
             _chunk_idx=$(( $_chunk_idx + 1 ))
         done
+
+        # Append the final chunk
+        echo "${12}" | base64 $_decode_flag >> "$_filename"
 
         # Set permissions on the file. Wedo this at the end in case the 
         # permissions preclude this process from appending more content.
         chmod "$_file_permissions" "$_filename"
-
     else
         # Determine the name of the chunk file
         _chunk_filename="$_uuid.$_idx"
         
-        # Write the content to the chunk file
-        echo "${12}" | base64 $_decode_flag > "$_chunk_filename"
+        # Write the content to the chunk file (still in base64 format)
+        echo $_echo_n "${12}${_echo_c}" > "$_chunk_filename"
     fi
 fi
 

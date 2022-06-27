@@ -1,13 +1,13 @@
 locals {
-  multi_chunk_base64_external_original_content = filebase64("${path.module}/random-bytes-large")
+  multi_chunk_base64_external_original_content = filebase64("${path.module}/random-bytes")
 }
 
 module "multi_chunk_base64_external" {
-  source         = "../"
-  filename       = "${path.module}/../tmpfiles/multi-chunk-base64-external.txt"
-  content_base64 = local.multi_chunk_base64_external_original_content
-  max_characters = length(local.multi_chunk_base64_external_original_content)
-  //chunk_size       = 76
+  source           = "../"
+  filename         = "${path.module}/../tmpfiles/multi-chunk-base64-external.txt"
+  content_base64   = local.multi_chunk_base64_external_original_content
+  max_characters   = length(local.multi_chunk_base64_external_original_content)
+  chunk_size       = 76
   unix_interpreter = var.unix_interpreter
 }
 
