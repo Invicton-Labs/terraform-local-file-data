@@ -12,9 +12,11 @@ This module also optionally supports "large" files. The [local_file](https://reg
 
 This module has been tested on many flavors of Linux, Windows, and MacOS. If a system that you use is not included in the automated testing, open an issue to request addition of your preferred OS/shell.
 
+
 ## Limitations
 
 - The `file_permission` and `directory_permission` variables have no effect when running on Windows, as PowerShell has no `chmod` equivalent.
+
 
 ## Usage
 
