@@ -32,6 +32,6 @@ module "check_delete_after_deleted" {
     // This forces a wait until the deletion has been completed as well
     module.delete_after
   ]
-  condition     = !fileexists(module.delete_after.datasource == {} ? module.delete_after.filename : "")
+  condition     = !fileexists(module.delete_after.datasource != {} ? module.delete_after.filename : "")
   error_message = "delete-after (deleted): expected file to be deleted, but it exists"
 }
