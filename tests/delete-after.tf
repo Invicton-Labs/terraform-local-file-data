@@ -5,17 +5,18 @@ module "delete_after" {
   unix_interpreter = var.unix_interpreter
   delete_after = [
     // This forces the delete to wait until the first check has occured
-    module.check_delete_after_exists.checked
+    //module.check_delete_after_exists.checked,
+    file(module.delete_after.created ? module.delete_after.filename : "")
   ]
 }
 
-module "check_delete_after_exists" {
-  source = "../assertion"
-  //version = "~>0.2.5"
-  // The ternary forces a wait until the file has been created
-  condition     = fileexists(module.delete_after.datasource != {} ? module.delete_after.filename : "")
-  error_message = "delete-after (exists): expected file to exist, but it does not"
-}
+# module "check_delete_after_exists" {
+#   source = "../assertion"
+#   //version = "~>0.2.5"
+#   // The ternary forces a wait until the file has been created
+#   condition     = fileexists(module.delete_after.datasource != {} ? module.delete_after.filename : "")
+#   error_message = "delete-after (exists): expected file to exist, but it does not"
+# }
 
 # module "check_delete_after_deleted" {
 #   source = "../assertion"
