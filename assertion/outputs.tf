@@ -16,5 +16,5 @@ data "null_data_source" "test" {
 
 output "checked" {
   description = "Whether the condition has passed validation (used for assertion dependencies)."
-  value       = md5(tostring(data.null_data_source.test.outputs)) != md5("") ? true : false
+  value       = md5(jsonencode(data.null_data_source.test.outputs)) != md5("") ? true : false
 }
