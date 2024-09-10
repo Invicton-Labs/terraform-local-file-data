@@ -56,8 +56,16 @@ locals {
   }
 }
 
+module "assert_at_least_one_chunk" {
+  source        = "Invicton-Labs/assertion/null"
+  version       = "~>0.2.5"
+  condition     = local.num_chunks > 0
+  error_message = "Num chunks: ${local.num_chunks}"
+}
+
 data "external" "create_file_chunk" {
   depends_on = [
+    module.assert_at_least_one_chunk,
     local.file_exists
   ]
   program  = local.is_windows ? ["powershell.exe", "${abspath(path.module)}/create.ps1"] : [var.unix_interpreter, "${abspath(path.module)}/create.sh"]
