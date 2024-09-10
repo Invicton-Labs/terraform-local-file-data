@@ -20,9 +20,7 @@ module "check_delete_after_exists" {
 }
 
 resource "terraform_data" "bootstrap" {
-  input = {
-    module_complete = module.delete_after.complete
-  }
+  input = module.delete_after.complete
 }
 # module "check_delete_after_deleted" {
 #   source = "../assertion"
