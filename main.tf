@@ -89,7 +89,7 @@ data "external" "create_file_chunk" {
     }
   )
   // Force the data source to wait for the apply, if that is what is desired
-  working_dir = (jsonencode(var.dynamic_depends_on) == "" ? true : true) && ((var.force_wait_for_apply ? uuid() : "") == "") ? "${path.module}/tmpfiles" : "${path.module}/tmpfiles"
+  working_dir = (jsonencode(var.dynamic_depends_on) != "" ? true : false) && ((var.force_wait_for_apply ? uuid() : "") == "") ? "${path.module}/tmpfiles" : "${path.module}/tmpfiles"
 }
 
 data "external" "delete_file" {
