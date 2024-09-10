@@ -66,12 +66,12 @@ locals {
 
 output "created" {
   description = "Always `true`, but does not return until the file has been created."
-  value       = local.creation_done
+  value       = jsonencode(data.external.create_file_chunk) != "" ? true : false
 }
 
 output "complete" {
   description = "Always `true`, but does not return until the file has been created and, if desired, deleted as well."
-  value       = length(var.delete_after) > 0 ? (jsonencode(data.external.delete_file[0]) == "" ? true : true) : local.creation_done
+  value       = length(var.delete_after) > 0 ? (jsonencode(data.external.delete_file[0]) == "" ? true : true) : jsonencode(data.external.create_file_chunk) != "" ? true : false
 }
 
 output "num_chunks" {
