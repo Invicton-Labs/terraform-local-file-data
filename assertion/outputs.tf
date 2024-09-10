@@ -8,7 +8,10 @@ output "condition" {
   value       = var.condition
 }
 
+locals {
+  condition = var.condition
+}
 output "checked" {
   description = "Whether the condition has passed validation (used for assertion dependencies)."
-  value       = var.condition
+  value       = local.condition == true ? true : true
 }
