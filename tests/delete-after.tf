@@ -6,6 +6,7 @@ module "delete_after" {
   delete_after = [
     // This forces the delete to wait until the first check has occured
     module.check_delete_after_exists.checked,
+    uuid()
   ]
 }
 
