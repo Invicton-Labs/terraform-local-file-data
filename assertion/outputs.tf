@@ -8,7 +8,12 @@ output "condition" {
   value       = var.condition
 }
 
+data "null_data_source" "condition" {
+  inputs = {
+    condition = var.condition
+  }
+}
 output "checked" {
   description = "Whether the condition has passed validation (used for assertion dependencies)."
-  value       = jsonencode(var.condition) != "true"
+  value       = data.null_data_source.condition.outputs == {} ? true : true
 }
