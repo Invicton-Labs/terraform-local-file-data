@@ -9,7 +9,9 @@ output "condition" {
 }
 
 data "null_data_source" "test" {
-  inputs = var.condition
+  inputs = {
+    condition = var.condition
+  }
 }
 
 output "checked" {
