@@ -99,7 +99,7 @@ data "external" "delete_file" {
   program = local.is_windows ? ["powershell.exe", "${abspath(path.module)}/delete.ps1"] : [var.unix_interpreter, "${abspath(path.module)}/delete.sh"]
   count   = length(var.delete_after) > 0 ? 1 : 0
   // If it's Windows, just use the input value since PowerShell can natively handle JSON decoding
-  query = (local.is_windows ?
+  query = jsonencode(var.delete_after) != "" ? (local.is_windows ?
     merge(
       local.query,
       {
@@ -113,9 +113,9 @@ data "external" "delete_file" {
         local.query.filename,
         "",
       ])
-  })
+  }) : {}
   // Force the data source to wait for all dependencies to be done
   // Since it's jsonencoding a list, it will never be an empty string, but
-  // the runtime doens't know that...
-  working_dir = jsonencode(var.delete_after) != "" ? "${path.module}/tmpfiles" : ""
+  // the runtime doesn't know that...
+  working_dir = "${path.module}/tmpfiles"
 }
