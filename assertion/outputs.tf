@@ -10,5 +10,5 @@ output "condition" {
 
 output "checked" {
   description = "Whether the condition has passed validation (used for assertion dependencies)."
-  value       = var.condition == true ? true : false
+  value       = var.condition
 }
