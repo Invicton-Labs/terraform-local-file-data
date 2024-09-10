@@ -19,13 +19,9 @@ module "check_delete_after_exists" {
   error_message = "delete-after (exists): expected file to exist, but it does not"
 }
 
-data "null_data_source" "debug" {
-  inputs = {
-    debug = module.delete_after.complete
-  }
+resource "terraform_data" "bootstrap" {
+  input = module.delete_after.complete
 }
-
-
 # module "check_delete_after_deleted" {
 #   source = "../assertion"
 #   # source  = "Invicton-Labs/assertion/null"
