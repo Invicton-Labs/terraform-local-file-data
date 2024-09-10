@@ -6,8 +6,13 @@ module "delete_after" {
   delete_after = [
     // This forces the delete to wait until the first check has occured
     //module.check_delete_after_exists.checked,
-    file(module.delete_after.created ? module.delete_after.filename : "")
+    locals.file_before
   ]
+}
+
+locals {
+  file_before = file(module.delete_after.created ? module.delete_after.filename : "")
+  file_after  = file(module.delete_after.complete ? module.delete_after.filename : "")
 }
 
 # module "check_delete_after_exists" {
