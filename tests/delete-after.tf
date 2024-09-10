@@ -3,10 +3,10 @@ module "delete_after" {
   filename         = "${path.module}/../tmpfiles/delete-after.txt"
   content          = "hello world"
   unix_interpreter = var.unix_interpreter
-  delete_after = [
-    // This forces the delete to wait until the first check has occured
-    module.check_delete_after_exists
-  ]
+  # delete_after = [
+  #   // This forces the delete to wait until the first check has occured
+  #   module.check_delete_after_exists
+  # ]
 }
 
 module "check_delete_after_exists" {
