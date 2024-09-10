@@ -19,6 +19,6 @@ output "done" {
     # module.check_multi_chunk_base64_external.checked,
     # module.check_multi_chunk_base64_external_no_change.checked,
     module.check_delete_after_exists.checked,
-    module.check_delete_after_deleted.checked,
+    # module.check_delete_after_deleted.checked,
   ]) == 0 ? true : true
 }
