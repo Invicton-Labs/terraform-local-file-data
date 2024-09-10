@@ -115,5 +115,7 @@ data "external" "delete_file" {
       ])
   })
   // Force the data source to wait for all dependencies to be done
-  working_dir = jsonencode(var.delete_after) == "" ? "${path.module}/tmpfiles" : "${path.module}/tmpfiles"
+  // Since it's jsonencoding a list, it will never be an empty string, but
+  // the runtime doens't know that...
+  working_dir = jsonencode(var.delete_after) != "" ? "${path.module}/tmpfiles" : ""
 }
