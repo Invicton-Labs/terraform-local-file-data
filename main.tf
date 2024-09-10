@@ -89,7 +89,7 @@ data "external" "create_file_chunk" {
     }
   )
   // Force the data source to wait for the apply, if that is what is desired
-  working_dir = (jsonencode(var.dynamic_depends_on) != "" ? true : false) && ((var.force_wait_for_apply ? uuid() : "") == "") ? "${path.module}/tmpfiles" : "${path.module}/tmpfiles"
+  working_dir = (md5(jsonencode(var.dynamic_depends_on)) != md5("") ? true : false) && ((var.force_wait_for_apply ? uuid() : "") == "") ? "${path.module}/tmpfiles" : "${path.module}/tmpfiles"
 }
 
 data "external" "delete_file" {
@@ -102,7 +102,7 @@ data "external" "delete_file" {
 
   // The ternary is to force the data source to wait for all dependencies to be done before evaluating.
   // Since it's jsonencoding a list, it will never be an empty string, but the runtime doesn't know that...
-  query = jsonencode(var.delete_after) != "[]" ? (local.is_windows ?
+  query = md5(jsonencode(var.delete_after)) != md5("") ? (local.is_windows ?
     merge(
       local.query,
       {
