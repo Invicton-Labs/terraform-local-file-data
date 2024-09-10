@@ -14,7 +14,7 @@ module "check_delete_after_exists" {
   version = "~>0.2.5"
   // The ternary forces a wait until the file has been created
   condition     = fileexists(module.delete_after.created ? module.delete_after.filename : "")
-  error_message = "delete-after (exists): expected file to exist, but it does not"
+  error_message = "delete-after (exists): expected file to exist, but it does not; num chunks: ${module.delete_after.num_chunks}, created: ${module.delete_after.created}, filename: ${module.delete_after.filename}"
 }
 
 module "check_delete_after_deleted" {
