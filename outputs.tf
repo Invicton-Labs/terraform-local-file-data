@@ -83,3 +83,7 @@ output "modified" {
   description = "Whether the file had been (or, if the file can't be created until apply-time, will be) modified. Will be `true` if the file doesn't already exist or if the contents have changed, and `false` otherwise."
   value       = local.needs_creation
 }
+
+output "datasource" {
+  value = data.external.create_file_chunk
+}
