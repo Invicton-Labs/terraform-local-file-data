@@ -8,13 +8,13 @@ output "condition" {
   value       = var.condition
 }
 
-data "null_data_source" "test" {
-  inputs = {
-    condition = var.condition
+data "cloudinit_config" "check" {
+  part {
+    content = var.condition
   }
 }
 
 output "checked" {
   description = "Whether the condition has passed validation (used for assertion dependencies)."
-  value       = md5(jsonencode(data.null_data_source.test.outputs)) != md5("") ? true : false
+  value       = data.cloudinit_config.check.rendered == "" ? true : true
 }
