@@ -69,18 +69,11 @@ locals {
 }
 
 output "created" {
-  depends_on = [
-    data.external.create_file_chunk,
-  ]
   description = "Always `true`, but does not return until the file has been created."
   value       = local.creation_done
 }
 
 output "complete" {
-  depends_on = [
-    data.external.create_file_chunk,
-    data.external.delete_file,
-  ]
   description = "Always `true`, but does not return until the file has been created and, if desired, deleted as well."
   value       = local.creation_done ? local.deletion_done : false
 }
