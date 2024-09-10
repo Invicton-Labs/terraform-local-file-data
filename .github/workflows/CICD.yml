@@ -28,7 +28,7 @@ jobs:
     steps:
       - name: Initialize - Pass
         id: init
-        uses: Invicton-Labs/terraform-module-testing/initialize@v0.2.0
+        uses: Invicton-Labs/terraform-module-testing/initialize@dev
         with:
           tf_path: tests
       - name: Run Tests - Pass
