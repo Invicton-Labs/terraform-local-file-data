@@ -92,16 +92,8 @@ data "external" "create_file_chunk" {
   working_dir = (jsonencode(var.dynamic_depends_on) != "" ? true : false) && ((var.force_wait_for_apply ? uuid() : "") == "") ? "${path.module}/tmpfiles" : "${path.module}/tmpfiles"
 }
 
-module "assert_delete_after" {
-  source        = "Invicton-Labs/assertion/null"
-  version       = "0.2.4"
-  condition     = false
-  error_message = jsonencode(var.delete_after)
-}
-
 data "external" "delete_file" {
   depends_on = [
-    module.assert_delete_after,
     data.external.create_file_chunk,
   ]
   program = local.is_windows ? ["powershell.exe", "${abspath(path.module)}/delete.ps1"] : [var.unix_interpreter, "${abspath(path.module)}/delete.sh"]
@@ -110,7 +102,7 @@ data "external" "delete_file" {
 
   // The ternary is to force the data source to wait for all dependencies to be done before evaluating.
   // Since it's jsonencoding a list, it will never be an empty string, but the runtime doesn't know that...
-  query = jsonencode(var.delete_after) != "" ? (local.is_windows ?
+  query = jsonencode(var.delete_after) != "[]" ? (local.is_windows ?
     merge(
       local.query,
       {
