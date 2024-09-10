@@ -65,11 +65,18 @@ locals {
 }
 
 output "created" {
+  depends_on = [
+    data.external.create_file_chunk,
+  ]
   description = "Always `true`, but does not return until the file has been created."
   value       = jsonencode(data.external.create_file_chunk) != "" ? true : false
 }
 
 output "complete" {
+  depends_on = [
+    data.external.create_file_chunk,
+    data.external.delete_file,
+  ]
   description = "Always `true`, but does not return until the file has been created and, if desired, deleted as well."
   value       = length(data.external.delete_file) > 0 ? (jsonencode(data.external.delete_file[0]) != "" ? true : false) : jsonencode(data.external.create_file_chunk) != "" ? true : false # TODO: switch to local val
 }
