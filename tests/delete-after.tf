@@ -19,9 +19,12 @@ module "check_delete_after_exists" {
   error_message = "delete-after (exists): expected file to exist, but it does not"
 }
 
-output "debug" {
-  value = module.delete_after.complete
+data "null_data_source" "debug" {
+  inputs = {
+    debug = module.delete_after.complete
+  }
 }
+
 
 # module "check_delete_after_deleted" {
 #   source = "../assertion"
