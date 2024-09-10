@@ -127,7 +127,7 @@ variable "delete_after" {
 
   This is useful if you need to write out a temporary file that is used by other shell scripts, such as credential files.
 EOF
-  type        = list(any)
+  type        = any
   default     = []
   nullable    = false
 }
