@@ -13,7 +13,7 @@ module "check_delete_after_exists" {
   source = "../assertion"
   //version = "~>0.2.5"
   // The ternary forces a wait until the file has been created
-  condition     = fileexists(module.delete_after.datasource == {} ? module.delete_after.filename : "")
+  condition     = fileexists(module.delete_after.datasource != {} ? module.delete_after.filename : "")
   error_message = "delete-after (exists): expected file to exist, but it does not"
 }
 
