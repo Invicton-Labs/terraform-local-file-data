@@ -25,14 +25,14 @@ locals {
 
 module "check_multi_chunk" {
   source        = "Invicton-Labs/assertion/null"
-  version       = "~>0.2.1"
+  version       = "~>0.2.5"
   condition     = local.multi_chunk == module.multi_chunk.content
   error_message = "multi-chunk: expected ${jsonencode(module.multi_chunk.content)}, got ${jsonencode(local.multi_chunk)}"
 }
 
 module "check_multi_chunk_no_change" {
   source  = "Invicton-Labs/assertion/null"
-  version = "~>0.2.1"
+  version = "~>0.2.5"
   depends_on = [
     module.check_multi_chunk
   ]

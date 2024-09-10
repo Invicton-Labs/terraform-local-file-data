@@ -29,14 +29,14 @@ locals {
 
 module "check_multi_chunk_base64" {
   source        = "Invicton-Labs/assertion/null"
-  version       = "~>0.2.1"
+  version       = "~>0.2.5"
   condition     = local.multi_chunk_base64 == local.multi_chunk_base64_original_content
   error_message = "multi-chunk-base64: expected ${jsonencode(local.multi_chunk_base64_original_content)}, got ${jsonencode(local.multi_chunk_base64)}"
 }
 
 module "check_multi_chunk_base64_no_change" {
   source  = "Invicton-Labs/assertion/null"
-  version = "~>0.2.1"
+  version = "~>0.2.5"
   depends_on = [
     module.check_multi_chunk_base64
   ]

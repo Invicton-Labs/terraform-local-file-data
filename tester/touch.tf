@@ -23,7 +23,7 @@ locals {
 
 module "check_touch" {
   source        = "Invicton-Labs/assertion/null"
-  version       = "~>0.2.1"
+  version       = "~>0.2.5"
   condition     = local.touch == "${module.touch_2.content}"
   error_message = "touch: expected ${jsonencode(module.touch_2.content)}, got ${jsonencode(local.touch)}"
 }

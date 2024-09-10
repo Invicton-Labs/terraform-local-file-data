@@ -1,9 +1,9 @@
 terraform {
-  required_version = ">= 0.14"
+  required_version = ">= 1.9.5"
   required_providers {
     external = {
       source  = "hashicorp/external"
-      version = ">= 1.1.0"
+      version = ">= 2.3.4"
     }
   }
 }
