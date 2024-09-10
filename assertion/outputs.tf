@@ -8,12 +8,10 @@ output "condition" {
   value       = var.condition
 }
 
-data "null_data_source" "condition" {
-  inputs = {
-    condition = var.condition
-  }
+resource "terraform_data" "assertion" {
+  input = var.condition
 }
 output "checked" {
   description = "Whether the condition has passed validation (used for assertion dependencies)."
-  value       = data.null_data_source.condition.outputs == {} ? true : true
+  value       = terraform_data.assertion.output != "" ? true : false
 }
