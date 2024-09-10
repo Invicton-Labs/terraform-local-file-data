@@ -5,31 +5,33 @@ module "delete_after" {
   unix_interpreter = var.unix_interpreter
   delete_after = [
     // This forces the delete to wait until the first check has occured
-    //module.check_delete_after_exists.checked,
-    local.file_before
+    module.check_delete_after_exists.checked,
+    //local.file_before
   ]
 }
 
-locals {
-  file_before = file(module.delete_after.created ? module.delete_after.filename : "")
-  file_after  = file(module.delete_after.complete ? module.delete_after.filename : "")
+# locals {
+#   file_before = file(module.delete_after.created ? module.delete_after.filename : "")
+#   file_after  = file(module.delete_after.complete ? module.delete_after.filename : "")
+# }
+
+module "check_delete_after_exists" {
+  # source = "../assertion"
+  source  = "Invicton-Labs/assertion/null"
+  version = "0.2.4"
+  // The ternary forces a wait until the file has been created
+  condition     = fileexists(module.delete_after.datasource != {} ? module.delete_after.filename : "")
+  error_message = "delete-after (exists): expected file to exist, but it does not"
 }
 
-# module "check_delete_after_exists" {
-#   source = "../assertion"
-#   //version = "~>0.2.5"
-#   // The ternary forces a wait until the file has been created
-#   condition     = fileexists(module.delete_after.datasource != {} ? module.delete_after.filename : "")
-#   error_message = "delete-after (exists): expected file to exist, but it does not"
-# }
-
-# module "check_delete_after_deleted" {
-#   source = "../assertion"
-#   //version = "~>0.2.5"
-#   depends_on = [
-#     // This forces a wait until the deletion has been completed as well
-#     module.delete_after
-#   ]
-#   condition     = !fileexists(module.delete_after.datasource == {} ? module.delete_after.filename : "")
-#   error_message = "delete-after (deleted): expected file to be deleted, but it exists"
-# }
+module "check_delete_after_deleted" {
+  # source = "../assertion"
+  source  = "Invicton-Labs/assertion/null"
+  version = "0.2.4"
+  depends_on = [
+    // This forces a wait until the deletion has been completed as well
+    module.delete_after
+  ]
+  condition     = !fileexists(module.delete_after.datasource == {} ? module.delete_after.filename : "")
+  error_message = "delete-after (deleted): expected file to be deleted, but it exists"
+}
