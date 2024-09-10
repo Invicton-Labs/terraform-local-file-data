@@ -2,6 +2,8 @@
 module "uuid" {
   source  = "Invicton-Labs/uuid/random"
   version = "~>0.2.0"
+  // We only need a UUID if it's multi-chunk
+  count = local.num_chunks > 1 ? 1 : 0
 }
 
 locals {
@@ -38,7 +40,8 @@ locals {
     i => local.needs_creation ? (local.is_base64 ? substr(var.content_base64, i * var.chunk_size, var.chunk_size) : base64encode(substr(var.content, i * var.chunk_size, var.chunk_size))) : ""
   }
 
-  uuid = module.uuid.uuid
+  // We only need a UUID if it's multi-chunk
+  uuid = local.num_chunks > 1 ? module.uuid[0].uuid : ""
 
   query = {
     create               = local.needs_creation ? "true" : "false"
